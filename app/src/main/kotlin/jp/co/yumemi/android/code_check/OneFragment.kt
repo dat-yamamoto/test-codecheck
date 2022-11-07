@@ -3,18 +3,19 @@
  */
 package jp.co.yumemi.android.code_check
 
+import android.content.Context
 import android.os.Bundle
-import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
-import android.widget.TextView
+import android.view.inputmethod.InputMethodManager
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.*
 import jp.co.yumemi.android.code_check.databinding.FragmentOneBinding
 
 class OneFragment: Fragment(R.layout.fragment_one){
+    private val viewModel: OneViewModel by activityViewModels()
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?)
     {
@@ -22,13 +23,12 @@ class OneFragment: Fragment(R.layout.fragment_one){
 
         val _binding= FragmentOneBinding.bind(view)
 
-        val _viewModel= OneViewModel(context!!)
-
-        val _layoutManager= LinearLayoutManager(context!!)
+        val _layoutManager= LinearLayoutManager(requireContext())
         val _dividerItemDecoration=
-            DividerItemDecoration(context!!, _layoutManager.orientation)
+            DividerItemDecoration(requireContext(), _layoutManager.orientation)
         val _adapter= CustomAdapter(object : CustomAdapter.OnItemClickListener{
             override fun itemClick(item: item){
+                _binding.searchInputText.editableText.clear()
                 gotoRepositoryFragment(item)
             }
         })
@@ -37,13 +37,18 @@ class OneFragment: Fragment(R.layout.fragment_one){
             .setOnEditorActionListener{ editText, action, _ ->
                 if (action== EditorInfo.IME_ACTION_SEARCH){
                     editText.text.toString().let {
-                        _viewModel.searchResults(it).apply{
-                            _adapter.submitList(this)
+                        if(it.isNotEmpty()){
+                            viewModel.searchResults(it).apply{
+                                _adapter.submitList(this)
+                            }
+                            val keyboard = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                            keyboard.hideSoftInputFromWindow(view.windowToken, 0)
                         }
                     }
                     return@setOnEditorActionListener true
+                } else {
+                    return@setOnEditorActionListener false
                 }
-                return@setOnEditorActionListener false
             }
 
         _binding.recyclerView.also{
@@ -58,47 +63,5 @@ class OneFragment: Fragment(R.layout.fragment_one){
         val _action= OneFragmentDirections
             .actionRepositoriesFragmentToRepositoryFragment(item= item)
         findNavController().navigate(_action)
-    }
-}
-
-val diff_util= object: DiffUtil.ItemCallback<item>(){
-    override fun areItemsTheSame(oldItem: item, newItem: item): Boolean
-    {
-        return oldItem.name== newItem.name
-    }
-
-    override fun areContentsTheSame(oldItem: item, newItem: item): Boolean
-    {
-        return oldItem== newItem
-    }
-
-}
-
-class CustomAdapter(
-    private val itemClickListener: OnItemClickListener,
-) : ListAdapter<item, CustomAdapter.ViewHolder>(diff_util){
-
-    class ViewHolder(view: View): RecyclerView.ViewHolder(view)
-
-    interface OnItemClickListener{
-    	fun itemClick(item: item)
-    }
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder
-    {
-    	val _view= LayoutInflater.from(parent.context)
-            .inflate(R.layout.layout_item, parent, false)
-    	return ViewHolder(_view)
-    }
-
-    override fun onBindViewHolder(holder: ViewHolder, position: Int)
-    {
-    	val _item= getItem(position)
-        (holder.itemView.findViewById<View>(R.id.repositoryNameView) as TextView).text=
-            _item.name
-
-    	holder.itemView.setOnClickListener{
-     		itemClickListener.itemClick(_item)
-    	}
     }
 }
